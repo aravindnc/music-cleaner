@@ -17,7 +17,7 @@ MusicCleaner is a high-speed desktop audio curation application for collectors w
   - `D` → Move song to Windows Recycle Bin & auto-advance.
   - `S` → Skip song & auto-advance.
   - `Space` → Play / Pause.
-  - `←` / `→` → Seek -5s / +5s.
+  - `←` / `→` → Seek -20s / +20s.
   - `Ctrl+←` / `Ctrl+→` → Previous / Next song.
   - `1` – `9` → Jump to 10% – 90% of song length.
   - `R` → Restart song.

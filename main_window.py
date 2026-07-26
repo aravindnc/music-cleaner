@@ -274,7 +274,7 @@ class MainWindow(QMainWindow):
         self.stats_label = QLabel("Keep: 0  |  Delete: 0  |  Skip: 0  |  Est. Time Left: 0.0 hrs")
         self.stats_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #eeeeee;")
 
-        shortcut_legend = QLabel("Shortcuts:  Enter/K: Keep   Delete/D: Delete   S: Skip   Space: Play/Pause   ←/→: Seek -5s/+5s   Ctrl+←/→: Prev/Next   1-9: Jump 10-90%   R: Restart   Ctrl+Z: Undo")
+        shortcut_legend = QLabel("Shortcuts:  Enter/K: Keep   Delete/D: Delete   S: Skip   Space: Play/Pause   ←/→: Seek -20s/+20s   Ctrl+←/→: Prev/Next   1-9: Jump 10-90%   R: Restart   Ctrl+Z: Undo")
         shortcut_legend.setStyleSheet("color: #888888; font-size: 11px;")
 
         copyright_label = QLabel("MusicCleaner © 2026 aravindnc.com — Open Source Audio Curation Tool")
@@ -327,8 +327,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence(Qt.Key_D), self, self.action_delete)
         QShortcut(QKeySequence(Qt.Key_S), self, self.action_skip)
         QShortcut(QKeySequence(Qt.Key_Space), self, self.player.toggle_play_pause)
-        QShortcut(QKeySequence(Qt.Key_Left), self, lambda: self.seek_relative(-5.0))
-        QShortcut(QKeySequence(Qt.Key_Right), self, lambda: self.seek_relative(5.0))
+        QShortcut(QKeySequence(Qt.Key_Left), self, lambda: self.seek_relative(-20.0))
+        QShortcut(QKeySequence(Qt.Key_Right), self, lambda: self.seek_relative(20.0))
         QShortcut(QKeySequence("Ctrl+Left"), self, self.prev_song)
         QShortcut(QKeySequence("Ctrl+Right"), self, self.next_song)
         QShortcut(QKeySequence(Qt.Key_R), self, self.restart_song)
