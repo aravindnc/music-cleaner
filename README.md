@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app_icon.png" alt="MusicCleaner Icon" width="128" height="128" />
+</p>
+
 # 🎵 MusicCleaner (Fast Song Reviewer)
 
 > **Rapidly review, keep, or delete thousands of MP3s with keyboard shortcuts.**
@@ -5,6 +9,8 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![UI Framework](https://img.shields.io/badge/PySide6-Qt6-green.svg)](https://pypi.org/project/PySide6/)
+
+![MusicCleaner Banner](banner.jpg)
 
 MusicCleaner is a high-speed desktop audio curation application for collectors with large music libraries (5,000 to 50,000+ tracks). Review **700–1,000 songs per hour** without confirmation popups or mouse clicks.
 
