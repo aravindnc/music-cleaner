@@ -16,12 +16,14 @@ from trash_service import TrashService
 from waveform_widget import WaveformWidget
 from decision_history_widget import DecisionHistoryWidget
 
+from version import __version__
+
 class MainWindow(QMainWindow):
     """Main application window for ultra-fast song review."""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("🎵 MusicCleaner - Rapidly review, keep, or delete thousands of MP3s")
+        self.setWindowTitle(f"🎵 MusicCleaner v{__version__} - Rapidly review, keep, or delete thousands of MP3s")
         self.resize(1100, 720)
         self.setMinimumSize(900, 600)
 
@@ -277,7 +279,7 @@ class MainWindow(QMainWindow):
         shortcut_legend = QLabel("Shortcuts:  Enter/K: Keep   Delete/D: Delete   S: Skip   Space: Play/Pause   ←/→: Seek -20s/+20s   Ctrl+←/→: Prev/Next   1-9: Jump 10-90%   R: Restart   Ctrl+Z: Undo")
         shortcut_legend.setStyleSheet("color: #888888; font-size: 11px;")
 
-        copyright_label = QLabel("MusicCleaner © 2026 aravindnc.com — Open Source Audio Curation Tool")
+        copyright_label = QLabel(f"MusicCleaner v{__version__} © 2026 aravindnc.com — Open Source Audio Curation Tool")
         copyright_label.setStyleSheet("color: #00adb5; font-size: 11px; font-weight: 500;")
 
         stats_layout.addWidget(self.stats_label)

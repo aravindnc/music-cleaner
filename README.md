@@ -72,7 +72,7 @@ To build your own single-file `.exe` executable with the embedded icon:
 
 2. Run the PyInstaller build command:
    ```bash
-   py -3 -m PyInstaller --noconsole --onefile --icon=app_icon.ico --add-data "app_icon.ico;." --name=MusicCleaner main.py
+   py -3 -m PyInstaller --noconsole --onefile --icon=app_icon.ico --add-data "app_icon.ico;." --version-file=file_version_info.txt --name=MusicCleaner main.py
    ```
 
 3. Find the generated executable in the **`dist/`** directory:
