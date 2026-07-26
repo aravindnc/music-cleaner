@@ -25,6 +25,9 @@ class MainWindow(QMainWindow):
         self.resize(1100, 720)
         self.setMinimumSize(900, 600)
 
+        if os.path.exists("app_icon.ico"):
+            self.setWindowIcon(QIcon("app_icon.ico"))
+
         # Core Services
         self.db = DatabaseManager()
         self.player = AudioPlayer(self)
@@ -274,8 +277,12 @@ class MainWindow(QMainWindow):
         shortcut_legend = QLabel("Shortcuts:  K: Keep   D: Delete   S: Skip   Space: Play/Pause   ←/→: Seek -5s/+5s   Ctrl+←/→: Prev/Next   1-9: Jump 10-90%   R: Restart   Ctrl+Z: Undo")
         shortcut_legend.setStyleSheet("color: #888888; font-size: 11px;")
 
+        copyright_label = QLabel("MusicCleaner © 2026 aravindnc.com — Open Source Audio Curation Tool")
+        copyright_label.setStyleSheet("color: #00adb5; font-size: 11px; font-weight: 500;")
+
         stats_layout.addWidget(self.stats_label)
         stats_layout.addWidget(shortcut_legend)
+        stats_layout.addWidget(copyright_label)
         left_layout.addWidget(stats_card)
 
         # Right Panel: Decision History Drawer
