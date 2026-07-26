@@ -31,7 +31,17 @@ MusicCleaner is a high-speed desktop audio curation application for collectors w
 
 ---
 
-## 🚀 Quick Start
+## 📦 Download Standalone Executable (Windows)
+
+No Python installation required! 
+
+1. Go to the [**Releases**](https://github.com/your-username/music-cleaner/releases) page.
+2. Download `MusicCleaner.exe`.
+3. Double-click to run!
+
+---
+
+## 🚀 Quick Start (From Source)
 
 ### 1. Installation
 
