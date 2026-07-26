@@ -61,22 +61,19 @@ python main.py
 
 ---
 
-## 🔨 How to Build Standalone `.exe`
+## 🔨 How to Build Standalone `.exe` (Auto-Versioning)
 
-To build your own single-file `.exe` executable with the embedded icon:
+To build your executable (which automatically bumps the patch version e.g. `1.0.0` -> `1.0.1` and embeds Windows metadata):
 
-1. Install PyInstaller:
+1. Run the build script:
    ```bash
-   pip install pyinstaller
+   python build.py
    ```
 
-2. Run the PyInstaller build command:
-   ```bash
-   py -3 -m PyInstaller --noconsole --onefile --icon=app_icon.ico --add-data "app_icon.ico;." --version-file=file_version_info.txt --name=MusicCleaner main.py
-   ```
-
-3. Find the generated executable in the **`dist/`** directory:
+2. Your output file will be saved to:
    > `dist/MusicCleaner.exe`
+
+*(You can also build manually using `py -3 -m PyInstaller --noconsole --onefile --icon=app_icon.ico --add-data "app_icon.ico;." --version-file=file_version_info.txt --name=MusicCleaner main.py`)*
 
 ---
 
