@@ -97,7 +97,12 @@ class AudioPlayer(QObject):
                 self._pending_start_pos = None
         elif HAS_PYGAME:
             try:
-                pygame.mixer.music.play(start=self.start_pos_offset)
+                # If paused, unpause; otherwise start playback
+                if hasattr(self, '_is_paused') and self._is_paused:
+                    pygame.mixer.music.unpause()
+                    self._is_paused = False
+                else:
+                    pygame.mixer.music.play(start=self.start_pos_offset)
                 self.timer.start()
             except Exception as e:
                 print(f"Pygame play error: {e}")
@@ -111,6 +116,7 @@ class AudioPlayer(QObject):
             self.timer.stop()
         elif HAS_PYGAME:
             pygame.mixer.music.pause()
+            self._is_paused = True
             self.timer.stop()
 
         self.is_playing_state = False

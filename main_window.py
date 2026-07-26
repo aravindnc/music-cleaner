@@ -573,11 +573,6 @@ class MainWindow(QMainWindow):
         self.waveform.set_position(pos_sec)
         self.time_label.setText(f"{self.format_time(pos_sec)} / {self.format_time(dur_sec)}")
 
-        # Save position to DB periodically
-        if self.current_index >= 0 and self.current_index < len(self.playlist):
-            filepath = self.playlist[self.current_index]['filepath']
-            self.db.update_last_position(filepath, pos_sec)
-
     def on_duration_changed(self, dur_sec):
         self.waveform.set_duration(dur_sec)
 
