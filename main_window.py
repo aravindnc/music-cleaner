@@ -220,7 +220,7 @@ class MainWindow(QMainWindow):
 
         # Super-Fast Action Row (Keep, Delete, Skip)
         action_row = QHBoxLayout()
-        self.keep_btn = QPushButton("✓ KEEP (K)")
+        self.keep_btn = QPushButton("✓ KEEP (Space / K)")
         self.keep_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2e7d32;
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #388e3c; }
         """)
 
-        self.delete_btn = QPushButton("🗑 DELETE (D)")
+        self.delete_btn = QPushButton("🗑 DELETE (Del / D)")
         self.delete_btn.setStyleSheet("""
             QPushButton {
                 background-color: #c62828;
@@ -274,7 +274,7 @@ class MainWindow(QMainWindow):
         self.stats_label = QLabel("Keep: 0  |  Delete: 0  |  Skip: 0  |  Est. Time Left: 0.0 hrs")
         self.stats_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #eeeeee;")
 
-        shortcut_legend = QLabel("Shortcuts:  K: Keep   D: Delete   S: Skip   Space: Play/Pause   ←/→: Seek -5s/+5s   Ctrl+←/→: Prev/Next   1-9: Jump 10-90%   R: Restart   Ctrl+Z: Undo")
+        shortcut_legend = QLabel("Shortcuts:  Space/K: Keep   Delete/D: Delete   S: Skip   ←/→: Seek -5s/+5s   Ctrl+←/→: Prev/Next   1-9: Jump 10-90%   R: Restart   Ctrl+Z: Undo")
         shortcut_legend.setStyleSheet("color: #888888; font-size: 11px;")
 
         copyright_label = QLabel("MusicCleaner © 2026 aravindnc.com — Open Source Audio Curation Tool")
@@ -320,9 +320,10 @@ class MainWindow(QMainWindow):
         self.history_widget.undo_requested.connect(self.action_undo)
 
     def setup_shortcuts(self):
-        QShortcut(QKeySequence(Qt.Key_Space), self, self.player.toggle_play_pause)
+        QShortcut(QKeySequence(Qt.Key_Space), self, self.action_keep)
         QShortcut(QKeySequence(Qt.Key_K), self, self.action_keep)
         QShortcut(QKeySequence(Qt.Key_D), self, self.action_delete)
+        QShortcut(QKeySequence(Qt.Key_Delete), self, self.action_delete)
         QShortcut(QKeySequence(Qt.Key_S), self, self.action_skip)
         QShortcut(QKeySequence(Qt.Key_Left), self, lambda: self.seek_relative(-5.0))
         QShortcut(QKeySequence(Qt.Key_Right), self, lambda: self.seek_relative(5.0))
