@@ -73,7 +73,7 @@ VSVersionInfo(
     ]
     print(f"\nBuilding executable for v{new_version}...")
     subprocess.run(cmd, check=True)
-    print(f"\n✅ Successfully built dist/MusicCleaner.exe (v{new_version})")
+    print(f"\n[OK] Successfully built dist/MusicCleaner.exe (v{new_version})")
 
 if __name__ == "__main__":
     bump_version()

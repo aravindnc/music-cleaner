@@ -1,8 +1,8 @@
 # VSVersionInfo file for Windows PyInstaller executable metadata
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 2, 0),
+    prodvers=(1, 0, 2, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -18,12 +18,12 @@ VSVersionInfo(
           [
             StringStruct(u'CompanyName', u'aravindnc.com'),
             StringStruct(u'FileDescription', u'MusicCleaner - Rapidly review, keep, or delete thousands of MP3s'),
-            StringStruct(u'FileVersion', u'1.0.0'),
+            StringStruct(u'FileVersion', u'1.0.2'),
             StringStruct(u'InternalName', u'MusicCleaner'),
             StringStruct(u'LegalCopyright', u'Copyright (c) 2026 aravindnc.com'),
             StringStruct(u'OriginalFilename', u'MusicCleaner.exe'),
             StringStruct(u'ProductName', u'MusicCleaner (Fast Song Reviewer)'),
-            StringStruct(u'ProductVersion', u'1.0.0.0')
+            StringStruct(u'ProductVersion', u'1.0.2.0')
           ]
         )
       ]

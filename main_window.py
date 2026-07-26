@@ -1,7 +1,9 @@
 import os
 import sys
+import io
 import random
 import math
+from concurrent.futures import ThreadPoolExecutor
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QFileDialog, QComboBox, 
                              QSplitter, QFrame, QMessageBox, QCheckBox, 
@@ -35,10 +37,13 @@ class MainWindow(QMainWindow):
         self.player = AudioPlayer(self)
         self.trash = TrashService()
 
-        # State
+        # State & Caching
         self.playlist = []
         self.current_index = -1
         self.preview_mode = "Start of song"  # "Start of song", "Random point", "Middle + 30s"
+        self.metadata_cache = {}  # filepath -> meta
+        self.audio_cache = {}     # filepath -> io.BytesIO
+        self.executor = ThreadPoolExecutor(max_workers=2)
 
         self.init_ui()
         self.connect_signals()
@@ -427,6 +432,47 @@ class MainWindow(QMainWindow):
     def on_preview_mode_changed(self, index):
         self.preview_mode = self.preview_combo.currentText()
 
+    def preload_upcoming_songs(self, current_idx):
+        if not self.playlist:
+            return
+
+        target_indices = [current_idx + 1, current_idx + 2, current_idx + 3, current_idx + 4, current_idx - 1]
+        valid_filepaths = []
+
+        for idx in target_indices:
+            if 0 <= idx < len(self.playlist):
+                valid_filepaths.append(self.playlist[idx]['filepath'])
+
+        def _worker(paths):
+            for path in paths:
+                if not os.path.exists(path):
+                    continue
+
+                if path not in self.metadata_cache:
+                    try:
+                        m = extract_metadata(path)
+                        if m:
+                            self.metadata_cache[path] = m
+                    except Exception:
+                        pass
+
+                if path not in self.audio_cache:
+                    try:
+                        with open(path, 'rb') as f:
+                            data = f.read()
+                        self.audio_cache[path] = io.BytesIO(data)
+                    except Exception:
+                        pass
+
+            if len(self.audio_cache) > 6:
+                curr_path = self.playlist[current_idx]['filepath'] if 0 <= current_idx < len(self.playlist) else ''
+                keep = set(paths + [curr_path])
+                keys_to_remove = [k for k in self.audio_cache if k not in keep]
+                for k in keys_to_remove[:len(self.audio_cache) - 5]:
+                    self.audio_cache.pop(k, None)
+
+        self.executor.submit(_worker, valid_filepaths)
+
     def load_song_at_index(self, index):
         if not self.playlist or index < 0 or index >= len(self.playlist):
             return
@@ -434,15 +480,21 @@ class MainWindow(QMainWindow):
         song = self.playlist[index]
         filepath = song['filepath']
 
-        # Extract metadata on-demand for active song
-        meta = extract_metadata(filepath)
+        # Extract/fetch cached metadata
+        if filepath in self.metadata_cache:
+            meta = self.metadata_cache[filepath]
+        else:
+            meta = extract_metadata(filepath)
+            if meta:
+                self.metadata_cache[filepath] = meta
+
         if meta:
             song['title'] = meta.get('title') or song['title']
             song['artist'] = meta.get('artist') or song['artist']
             song['album'] = meta.get('album') or song['album']
             song['duration'] = meta.get('duration') or song['duration']
             song['bitrate'] = meta.get('bitrate') or song['bitrate']
-            self.db.upsert_song(song)
+            self.executor.submit(self.db.upsert_song, song)
 
         # UI text updates
         self.title_label.setText(f"Song: {song.get('title') or os.path.basename(filepath)}")
@@ -473,14 +525,23 @@ class MainWindow(QMainWindow):
             if "Middle + 30s" in self.preview_mode and duration > 60:
                 start_pos = (duration / 2.0)
             elif "Random point" in self.preview_mode and duration > 30:
-                start_pos = random.uniform(10, max(10, duration - 30))
+                start_pos = random.uniform(5.0, max(5.0, duration - 15.0))
 
-        self.player.load_song(filepath, start_position=start_pos)
-        self.player.play()
+        # Retrieve in-memory RAM buffer if pre-loaded
+        cached_buffer = self.audio_cache.get(filepath)
+
+        loaded = self.player.load_song(filepath, start_position=start_pos, file_buffer=cached_buffer)
+        if loaded:
+            self.player.play()
+        else:
+            self.title_label.setText(f"⚠️ Audio Load Failed: {song.get('title') or os.path.basename(filepath)}")
 
         self.waveform.set_duration(duration if duration > 0 else 100.0)
         self.waveform.set_position(start_pos)
         self.update_counter()
+
+        # Background pre-load next 4 songs into RAM cache
+        self.preload_upcoming_songs(index)
 
     def clear_song_display(self):
         self.player.stop()

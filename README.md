@@ -2,95 +2,68 @@
   <img src="app_icon.png" alt="MusicCleaner Icon" width="128" height="128" />
 </p>
 
-# 🎵 MusicCleaner (Fast Song Reviewer)
+# 🎵 MusicCleaner
 
-> **Rapidly review, keep, or delete thousands of MP3s with keyboard shortcuts.**
+> **Rapidly review, keep, or delete thousands of audio files with lightning-fast keyboard shortcuts.**
 
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![UI Framework](https://img.shields.io/badge/PySide6-Qt6-green.svg)](https://pypi.org/project/PySide6/)
-
-![MusicCleaner Banner](banner.jpg)
-
-MusicCleaner is a high-speed desktop audio curation application for collectors with large music libraries (5,000 to 50,000+ tracks). Review **700–1,000 songs per hour** without confirmation popups or mouse clicks.
+MusicCleaner is a high-speed desktop audio curation app designed to clean up large music collections (5,000 to 50,000+ tracks). Easily review 700–1,000 songs per hour without popups or mouse clicks.
 
 ---
 
-## ⚡ Key Features
+## ✨ Features
 
-- **Super-Fast Keyboard Workflow**:
-  - `K` → Keep song & auto-advance.
-  - `D` → Move song to Windows Recycle Bin & auto-advance.
-  - `S` → Skip song & auto-advance.
-  - `Space` → Play / Pause.
-  - `←` / `→` → Seek -20s / +20s.
-  - `Ctrl+←` / `Ctrl+→` → Previous / Next song.
-  - `1` – `9` → Jump to 10% – 90% of song length.
-  - `R` → Restart song.
-  - `Ctrl+Z` → Undo last action.
-- **Smart Audio Previews**: Skip boring intros with 3 preview modes (Start, Middle + 30s, or Random Point).
-- **Interactive Waveform Slider**: Visual audio waveform with click, drag, and mouse-wheel seeking.
-- **Automatic Resume (SQLite)**: Automatically saves progress (`song.db`) so you can resume anytime.
-- **Safe Recycle Bin Deletion**: Uses `send2trash` so deleted files can be restored anytime.
-- **Decision History & Undo Drawer**: Side panel showing your last 50 decisions with 1-click Undo.
-- **Instant Large Library Support**: Loads 10,000+ songs in under 0.5 seconds using bulk transaction batching.
+- ⚡ **Lightning-Fast Playback**: Zero-delay song switching with background RAM pre-buffering.
+- ⌨️ **Keyboard-Driven Workflow**: Single keypress to Keep, Delete, Skip, Seek, or Undo.
+- 🎯 **Smart Preview Modes**: Jump straight to the action with 3 preview options (*Start of song*, *Middle + 30s*, or *Random point*).
+- 🌊 **Interactive Waveform**: Visual audio timeline with click, drag, and mouse-wheel seeking.
+- 🗑️ **Safe Recycle Bin Deletion**: Deletes files safely to your OS Recycle Bin so nothing is lost permanently.
+- 🔍 **Smart Filters & Duplicate Detection**: Quickly filter by *Unreviewed Only*, *Duplicates Only*, *320 kbps Only*, *Unknown Artist*, or *Longer than 7 min*.
+- 📜 **Decision History & Undo**: Track your recent decisions with instant 1-click Undo (`Ctrl+Z`).
+- 💾 **Auto-Save Progress**: Automatically saves your curation state so you can close and resume anytime.
 
 ---
 
-## 📦 Download Standalone Executable (Windows)
+## 📖 How to Use
 
-No Python installation required! 
+1. **Scan Folders**: Click `📁 Scan Folders` to select your music directory.
+2. **Review Songs**: Use keyboard shortcuts to quickly organize your songs:
 
-1. Go to the [**Releases**](https://github.com/your-username/music-cleaner/releases) page.
-2. Download `MusicCleaner.exe`.
-3. Double-click to run!
+| Shortcut | Action |
+| :--- | :--- |
+| **`K` / `Enter`** | **Keep** song and move to next |
+| **`D` / `Delete`** | **Delete** song (Move to Recycle Bin) |
+| **`S`** | **Skip** song for later review |
+| **`Space`** | Play / Pause playback |
+| **`←` / `→`** | Seek -20s / +20s |
+| **`Ctrl+←` / `Ctrl+→`** | Jump to Previous / Next song |
+| **`1` – `9`** | Jump to 10% – 90% of track length |
+| **`R`** | Restart song from 0:00 |
+| **`Ctrl+Z`** | **Undo** last decision |
+
+3. **Use Filters**: Filter your library using the top dropdown menu to focus on unreviewed tracks, duplicates, or specific quality criteria.
 
 ---
 
-## 🚀 Quick Start (From Source)
+## 🚀 Getting Started
 
-### 1. Installation
+### Using the Standalone Executable (Windows)
 
-Clone the repository and install requirements:
+1. Download `MusicCleaner.exe` from the latest release.
+2. Double-click `MusicCleaner.exe` to launch. No installation required!
+
+### Running from Source
 
 ```bash
-git clone https://github.com/your-username/music-cleaner.git
+# Clone the repository
+git clone https://github.com/aravindnc/music-cleaner.git
 cd music-cleaner
+
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Launching the App
-
-```bash
+# Launch MusicCleaner
 python main.py
 ```
-
----
-
-## 🔨 How to Build Standalone `.exe` (Auto-Versioning)
-
-To build your executable (which automatically bumps the patch version e.g. `1.0.0` -> `1.0.1` and embeds Windows metadata):
-
-1. Run the build script:
-   ```bash
-   python build.py
-   ```
-
-2. Your output file will be saved to:
-   > `dist/MusicCleaner.exe`
-
-*(You can also build manually using `py -3 -m PyInstaller --noconsole --onefile --icon=app_icon.ico --add-data "app_icon.ico;." --version-file=file_version_info.txt --name=MusicCleaner main.py`)*
-
----
-
-## 🛠 Tech Stack
-
-- **Python 3.10+**
-- **PySide6** (Qt6 Desktop Interface)
-- **pygame.mixer / python-vlc** (Audio Playback Engine)
-- **mutagen** (Audio Metadata Parsing & Artwork Extraction)
-- **Send2Trash** (Windows Recycle Bin Safe Deletion)
-- **SQLite** (Session Progress & Decision Log)
 
 ---
 

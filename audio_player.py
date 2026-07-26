@@ -38,8 +38,11 @@ class AudioPlayer(QObject):
         self.use_pygame = HAS_PYGAME and not HAS_VLC
         self.current_filepath = None
         self.is_playing_state = False
+        self._is_paused = False
         self._duration = 0.0
         self.start_pos_offset = 0.0
+        self._play_grace_ticks = 0
+        self._pending_start_pos = None
 
         if self.use_vlc:
             try:
@@ -59,53 +62,82 @@ class AudioPlayer(QObject):
             self.timer.setInterval(100)
             self.timer.timeout.connect(self._poll_pygame_position)
 
-
-
-
-    def load_song(self, filepath, start_position=0.0):
+    def load_song(self, filepath, start_position=0.0, file_buffer=None):
         self.stop()
         self.current_filepath = filepath
+        self._pending_start_pos = start_position if start_position > 0 else None
 
-        if not os.path.exists(filepath):
+        if not os.path.exists(filepath) and file_buffer is None:
+            print(f"File not found: {filepath}")
             return False
 
         if self.use_vlc:
-            media = self.vlc_instance.media_new(filepath)
-            self.vlc_player.set_media(media)
-            if start_position > 0:
-                self._pending_start_pos = start_position
-            else:
-                self._pending_start_pos = None
-        elif HAS_PYGAME:
             try:
-                pygame.mixer.music.load(filepath)
-                self.start_pos_offset = start_position
+                media = self.vlc_instance.media_new(filepath)
+                self.vlc_player.set_media(media)
+                return True
             except Exception as e:
-                print(f"Pygame load error: {e}")
+                print(f"VLC load error: {e}")
+                return False
+        elif self.use_pygame:
+            norm_path = os.path.normpath(filepath)
+            try:
+                pygame.mixer.music.unload()
+            except Exception:
+                pass
 
-        return True
+            ext = os.path.splitext(filepath)[1].lower()
+            loaded_ok = False
+
+            if file_buffer is not None:
+                try:
+                    file_buffer.seek(0)
+                    pygame.mixer.music.load(file_buffer, ext)
+                    loaded_ok = True
+                except Exception as e:
+                    print(f"BytesIO buffer load failed ({e}), falling back to file path load")
+
+            if not loaded_ok:
+                try:
+                    pygame.mixer.music.load(norm_path)
+                    loaded_ok = True
+                except Exception as e:
+                    print(f"Pygame load error for {filepath}: {e}")
+                    return False
+
+            self.start_pos_offset = start_position
+            return True
+
+        return False
 
     def play(self):
         if not self.current_filepath:
             return
 
+        self._is_paused = False
+
         if self.use_vlc:
             self.vlc_player.play()
             self.timer.start()
-            if hasattr(self, '_pending_start_pos') and self._pending_start_pos:
-                QTimer.singleShot(150, lambda: self.seek(self._pending_start_pos))
-                self._pending_start_pos = None
-        elif HAS_PYGAME:
+        elif self.use_pygame:
             try:
-                # If paused, unpause; otherwise start playback
-                if hasattr(self, '_is_paused') and self._is_paused:
-                    pygame.mixer.music.unpause()
-                    self._is_paused = False
+                if self.start_pos_offset > 0:
+                    try:
+                        pygame.mixer.music.play(start=self.start_pos_offset)
+                    except Exception as e:
+                        print(f"Pygame start offset failed ({e}), playing from 0:00")
+                        self.start_pos_offset = 0.0
+                        pygame.mixer.music.play()
                 else:
-                    pygame.mixer.music.play(start=self.start_pos_offset)
+                    pygame.mixer.music.play()
+                
+                self._play_grace_ticks = 4  # 400ms grace period for Pygame init
                 self.timer.start()
             except Exception as e:
                 print(f"Pygame play error: {e}")
+                self.is_playing_state = False
+                self.state_changed.emit(False)
+                return
 
         self.is_playing_state = True
         self.state_changed.emit(True)
@@ -114,7 +146,7 @@ class AudioPlayer(QObject):
         if self.use_vlc:
             self.vlc_player.pause()
             self.timer.stop()
-        elif HAS_PYGAME:
+        elif self.use_pygame:
             pygame.mixer.music.pause()
             self._is_paused = True
             self.timer.stop()
@@ -123,16 +155,23 @@ class AudioPlayer(QObject):
         self.state_changed.emit(False)
 
     def toggle_play_pause(self):
-        if self.is_playing_state:
+        if self.is_playing_state and not self._is_paused:
             self.pause()
         else:
-            self.play()
+            if self._is_paused and self.use_pygame:
+                pygame.mixer.music.unpause()
+                self._is_paused = False
+                self.is_playing_state = True
+                self.timer.start()
+                self.state_changed.emit(True)
+            else:
+                self.play()
 
     def stop(self):
         if self.use_vlc:
             self.vlc_player.stop()
             self.timer.stop()
-        elif HAS_PYGAME:
+        elif self.use_pygame:
             pygame.mixer.music.stop()
             try:
                 pygame.mixer.music.unload()
@@ -140,6 +179,7 @@ class AudioPlayer(QObject):
                 pass
             self.timer.stop()
 
+        self._is_paused = False
         self.is_playing_state = False
         self.state_changed.emit(False)
 
@@ -152,13 +192,14 @@ class AudioPlayer(QObject):
             if length > 0:
                 pos_fraction = max(0.0, min(1.0, position_sec / length))
                 self.vlc_player.set_position(pos_fraction)
-        elif HAS_PYGAME:
+        elif self.use_pygame:
             self.start_pos_offset = position_sec
             if self.is_playing_state:
                 try:
                     pygame.mixer.music.play(start=position_sec)
-                except Exception:
-                    pass
+                    self._play_grace_ticks = 4
+                except Exception as e:
+                    print(f"Pygame seek error: {e}")
 
         self.position_changed.emit(position_sec)
 
@@ -166,7 +207,7 @@ class AudioPlayer(QObject):
         if self.use_vlc:
             ms = self.vlc_player.get_time()
             return max(0.0, ms / 1000.0) if ms >= 0 else 0.0
-        elif HAS_PYGAME:
+        elif self.use_pygame:
             get_pos = pygame.mixer.music.get_pos()  # milliseconds since play() called
             if get_pos >= 0:
                 return self.start_pos_offset + (get_pos / 1000.0)
@@ -186,14 +227,20 @@ class AudioPlayer(QObject):
         pos = self.get_position()
         dur = self.get_duration()
 
-        if dur > 0 and dur != self._duration:
-            self._duration = dur
-            self.duration_changed.emit(dur)
+        if dur > 0:
+            if dur != self._duration:
+                self._duration = dur
+                self.duration_changed.emit(dur)
+
+            if self._pending_start_pos is not None:
+                pending = self._pending_start_pos
+                self._pending_start_pos = None
+                self.seek(pending)
 
         self.position_changed.emit(pos)
 
         state = self.vlc_player.get_state()
-        if state == vlc.State.Ended:
+        if state in (vlc.State.Ended, vlc.State.Error):
             self.stop()
             self.playback_ended.emit()
 
@@ -204,7 +251,11 @@ class AudioPlayer(QObject):
         pos = self.get_position()
         self.position_changed.emit(pos)
 
-        if not pygame.mixer.music.get_busy() and self.is_playing_state:
+        if self._play_grace_ticks > 0:
+            self._play_grace_ticks -= 1
+            return
+
+        if self.is_playing_state and not pygame.mixer.music.get_busy():
             self.stop()
             self.playback_ended.emit()
 
@@ -218,3 +269,4 @@ class AudioPlayer(QObject):
             self.is_playing_state = False
             self.state_changed.emit(False)
             self.playback_ended.emit()
+

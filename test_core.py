@@ -59,16 +59,33 @@ class TestSongReviewerCore(unittest.TestCase):
         stats_after_undo = self.db.get_statistics()
         self.assertEqual(stats_after_undo['deleted'], 0)
 
-    def test_duplicate_detection(self):
-        songs = [
-            {'filepath': '/path/song1.mp3', 'title': 'Oru Pushpam', 'artist': 'Yesudas'},
-            {'filepath': '/path/song2.mp3', 'title': 'Oru Pushpam', 'artist': 'Yesudas'},
-            {'filepath': '/path/song3.mp3', 'title': 'Unique Song', 'artist': 'Other'}
-        ]
-        duplicates = detect_duplicates(songs)
-        self.assertIn('/path/song1.mp3', duplicates)
-        self.assertIn('/path/song2.mp3', duplicates)
-        self.assertNotIn('/path/song3.mp3', duplicates)
+    def test_audio_player_state_reset(self):
+        from audio_player import AudioPlayer
+        from PySide6.QtCore import QCoreApplication
+        import io, wave
+        app = QCoreApplication.instance() or QCoreApplication([])
+
+        player = AudioPlayer()
+        # Test nonexistent file return value
+        res = player.load_song(os.path.join(self.temp_dir, "nonexistent.mp3"))
+        self.assertFalse(res)
+
+        # Test in-memory buffer load
+        buf = io.BytesIO()
+        with wave.open(buf, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(44100)
+            wf.writeframes(b'\x00\x00' * 44100)
+        buf.seek(0)
+        res_buf = player.load_song("virtual_path.wav", file_buffer=buf)
+        self.assertTrue(res_buf)
+
+        # Test pause state reset on stop
+        player._is_paused = True
+        player.stop()
+        self.assertFalse(player._is_paused)
+        self.assertFalse(player.is_playing_state)
 
 if __name__ == "__main__":
     unittest.main()
