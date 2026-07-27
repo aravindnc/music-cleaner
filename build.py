@@ -45,7 +45,7 @@ VSVersionInfo(
             StringStruct(u'FileVersion', u'{new_version}'),
             StringStruct(u'InternalName', u'MusicCleaner'),
             StringStruct(u'LegalCopyright', u'Copyright (c) 2026 aravindnc.com'),
-            StringStruct(u'OriginalFilename', u'MusicCleaner.exe'),
+            StringStruct(u'OriginalFilename', u'MusicCleaner_v{new_version}.exe'),
             StringStruct(u'ProductName', u'MusicCleaner (Fast Song Reviewer)'),
             StringStruct(u'ProductVersion', u'{new_version}.0')
           ]
@@ -61,6 +61,7 @@ VSVersionInfo(
         print("Updated file_version_info.txt")
 
     # 3. Trigger PyInstaller build
+    exe_name = f"MusicCleaner_v{new_version}"
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconsole",
@@ -68,12 +69,12 @@ VSVersionInfo(
         "--icon=app_icon.ico",
         "--add-data", "app_icon.ico;.",
         "--version-file=file_version_info.txt",
-        "--name=MusicCleaner",
+        f"--name={exe_name}",
         "main.py"
     ]
     print(f"\nBuilding executable for v{new_version}...")
     subprocess.run(cmd, check=True)
-    print(f"\n[OK] Successfully built dist/MusicCleaner.exe (v{new_version})")
+    print(f"\n[OK] Successfully built dist/{exe_name}.exe (v{new_version})")
 
 if __name__ == "__main__":
     bump_version()

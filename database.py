@@ -216,6 +216,15 @@ class DatabaseManager:
                 'unreviewed': row['unreviewed'] or 0
             }
 
+    DEFAULT_SETTINGS = {
+        'volume': '80',
+        'preview_mode': 'Start of song (0:00)',
+        'custom_start_sec': '0.0',
+        'auto_skip_enabled': 'False',
+        'auto_skip_sec': '15',
+        'delete_mode': 'recycle_bin',
+    }
+
     def set_setting(self, key, value):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -227,4 +236,17 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
             row = cursor.fetchone()
-            return row['value'] if row else default
+            if row:
+                return row['value']
+            return self.DEFAULT_SETTINGS.get(key, default)
+
+    def get_all_settings(self):
+        """Retrieve all settings as a dict with default fallbacks."""
+        settings = dict(self.DEFAULT_SETTINGS)
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM settings")
+            for row in cursor.fetchall():
+                settings[row['key']] = row['value']
+        return settings
+

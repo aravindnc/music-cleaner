@@ -43,6 +43,9 @@ class AudioPlayer(QObject):
         self.start_pos_offset = 0.0
         self._play_grace_ticks = 0
         self._pending_start_pos = None
+        self._current_buffer = None
+        self._current_vlc_media = None
+        self.volume_pct = 80
 
         if self.use_vlc:
             try:
@@ -62,6 +65,31 @@ class AudioPlayer(QObject):
             self.timer.setInterval(100)
             self.timer.timeout.connect(self._poll_pygame_position)
 
+    def set_volume(self, volume_pct):
+        """Set playback volume (0 to 100)."""
+        self.volume_pct = max(0, min(100, int(volume_pct)))
+        if self.use_vlc:
+            try:
+                self.vlc_player.audio_set_volume(self.volume_pct)
+            except Exception as e:
+                print(f"VLC volume set error: {e}")
+        elif self.use_pygame:
+            try:
+                pygame.mixer.music.set_volume(self.volume_pct / 100.0)
+            except Exception as e:
+                print(f"Pygame volume set error: {e}")
+
+    def get_volume(self):
+        """Get playback volume (0 to 100)."""
+        if self.use_vlc:
+            try:
+                v = self.vlc_player.audio_get_volume()
+                if v >= 0:
+                    return v
+            except Exception:
+                pass
+        return self.volume_pct
+
     def load_song(self, filepath, start_position=0.0, file_buffer=None):
         self.stop()
         self.current_filepath = filepath
@@ -72,13 +100,72 @@ class AudioPlayer(QObject):
             return False
 
         if self.use_vlc:
-            try:
-                media = self.vlc_instance.media_new(filepath)
-                self.vlc_player.set_media(media)
-                return True
-            except Exception as e:
-                print(f"VLC load error: {e}")
+            loaded_ok = False
+            
+            # Prioritize direct file loading when file exists on disk
+            if os.path.exists(filepath):
+                try:
+                    norm_path = os.path.normpath(filepath)
+                    media = self.vlc_instance.media_new(norm_path)
+                    self._current_vlc_media = media
+                    self.vlc_player.set_media(media)
+                    loaded_ok = True
+                except Exception as e:
+                    print(f"VLC path load error ({e}), trying buffer fallback...")
+
+            # Fallback to file buffer if file path load failed or file doesn't exist on disk (e.g. virtual stream)
+            if not loaded_ok and file_buffer is not None:
+                try:
+                    import io, ctypes
+                    if isinstance(file_buffer, bytes):
+                        raw_data = file_buffer
+                    elif hasattr(file_buffer, 'getvalue'):
+                        raw_data = file_buffer.getvalue()
+                    else:
+                        file_buffer.seek(0)
+                        raw_data = file_buffer.read()
+
+                    stream = io.BytesIO(raw_data)
+                    stream_len = len(raw_data)
+
+                    @vlc.CallbackDecorators.LD_OPEN
+                    def open_cb(opaque, data_pointer, size_pointer):
+                        size_pointer.contents.value = stream_len
+                        stream.seek(0)
+                        return 0
+
+                    @vlc.CallbackDecorators.LD_READ
+                    def read_cb(opaque, buf_ptr, count):
+                        data = stream.read(count)
+                        if data:
+                            ctypes.memmove(buf_ptr, data, len(data))
+                            return len(data)
+                        return 0
+
+                    @vlc.CallbackDecorators.LD_SEEK
+                    def seek_cb(opaque, offset):
+                        stream.seek(offset)
+                        return 0
+
+                    @vlc.CallbackDecorators.LD_CLOSE
+                    def close_cb(opaque):
+                        pass
+
+                    media = self.vlc_instance.media_new_callbacks(open_cb, read_cb, seek_cb, close_cb, None)
+                    # Retain media reference on self to prevent Python GC from unbinding ctypes callbacks
+                    media._cb_refs = (open_cb, read_cb, seek_cb, close_cb, stream)
+                    self._current_vlc_media = media
+                    self.vlc_player.set_media(media)
+                    loaded_ok = True
+                except Exception as e:
+                    print(f"VLC buffer load failed: {e}")
+
+            if not loaded_ok:
                 return False
+
+            self.set_volume(self.volume_pct)
+            return True
+
         elif self.use_pygame:
             norm_path = os.path.normpath(filepath)
             try:
@@ -86,25 +173,57 @@ class AudioPlayer(QObject):
             except Exception:
                 pass
 
-            ext = os.path.splitext(filepath)[1].lower()
             loaded_ok = False
 
-            if file_buffer is not None:
-                try:
-                    file_buffer.seek(0)
-                    pygame.mixer.music.load(file_buffer, ext)
-                    loaded_ok = True
-                except Exception as e:
-                    print(f"BytesIO buffer load failed ({e}), falling back to file path load")
+            # Prioritize direct file path loading when file exists on disk
+            if os.path.exists(norm_path):
+                import time
+                for attempt in range(3):
+                    try:
+                        pygame.mixer.music.load(norm_path)
+                        loaded_ok = True
+                        break
+                    except Exception as e:
+                        time.sleep(0.05)
+                if not loaded_ok:
+                    print(f"Pygame load error for path {filepath}")
+
+            # Fallback to buffer loading if path load failed or virtual stream
+            if not loaded_ok and file_buffer is not None:
+                raw_data = None
+                if isinstance(file_buffer, bytes):
+                    raw_data = file_buffer
+                elif hasattr(file_buffer, 'getvalue'):
+                    raw_data = file_buffer.getvalue()
+                else:
+                    try:
+                        file_buffer.seek(0)
+                        raw_data = file_buffer.read()
+                    except Exception:
+                        pass
+
+                if raw_data:
+                    try:
+                        import io
+                        self._current_buffer = io.BytesIO(raw_data)
+                        ext_clean = os.path.splitext(filepath)[1].lower().lstrip('.')
+                        hints = [h for h in [ext_clean, 'mp3', 'wav', 'ogg'] if h]
+
+                        for hint in hints:
+                            try:
+                                self._current_buffer.seek(0)
+                                pygame.mixer.music.load(self._current_buffer, hint)
+                                loaded_ok = True
+                                break
+                            except Exception:
+                                continue
+                    except Exception as e:
+                        print(f"BytesIO buffer load failed ({e})")
 
             if not loaded_ok:
-                try:
-                    pygame.mixer.music.load(norm_path)
-                    loaded_ok = True
-                except Exception as e:
-                    print(f"Pygame load error for {filepath}: {e}")
-                    return False
+                return False
 
+            self.set_volume(self.volume_pct)
             self.start_pos_offset = start_position
             return True
 
@@ -181,6 +300,7 @@ class AudioPlayer(QObject):
 
         self._is_paused = False
         self.is_playing_state = False
+        self._current_buffer = None
         self.state_changed.emit(False)
 
     def seek(self, position_sec):

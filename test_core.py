@@ -87,5 +87,44 @@ class TestSongReviewerCore(unittest.TestCase):
         self.assertFalse(player._is_paused)
         self.assertFalse(player.is_playing_state)
 
+    def test_database_settings(self):
+        # Default settings
+        settings = self.db.get_all_settings()
+        self.assertEqual(settings['volume'], '80')
+        self.assertEqual(settings['delete_mode'], 'recycle_bin')
+
+        # Custom settings set/get
+        self.db.set_setting('volume', 90)
+        self.db.set_setting('custom_start_sec', 15.5)
+
+        self.assertEqual(self.db.get_setting('volume'), '90')
+        self.assertEqual(self.db.get_setting('custom_start_sec'), '15.5')
+
+        updated = self.db.get_all_settings()
+        self.assertEqual(updated['volume'], '90')
+        self.assertEqual(updated['custom_start_sec'], '15.5')
+
+    def test_audio_player_volume_and_bytes(self):
+        from audio_player import AudioPlayer
+        from PySide6.QtCore import QCoreApplication
+        import io, wave
+        app = QCoreApplication.instance() or QCoreApplication([])
+
+        player = AudioPlayer()
+        player.set_volume(50)
+        self.assertEqual(player.get_volume(), 50)
+
+        # Test raw bytes buffer load
+        buf = io.BytesIO()
+        with wave.open(buf, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(44100)
+            wf.writeframes(b'\x00\x00' * 44100)
+        raw_bytes = buf.getvalue()
+
+        res_bytes = player.load_song("virtual_path.wav", file_buffer=raw_bytes)
+        self.assertTrue(res_bytes)
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,7 @@ from metadata_service import scan_directory, extract_metadata, detect_duplicates
 from trash_service import TrashService
 from waveform_widget import WaveformWidget
 from decision_history_widget import DecisionHistoryWidget
+from settings_dialog import SettingsDialog
 
 from version import __version__
 
@@ -32,17 +33,26 @@ class MainWindow(QMainWindow):
         if os.path.exists("app_icon.ico"):
             self.setWindowIcon(QIcon("app_icon.ico"))
 
-        # Core Services
+        # Core Services & Settings
         self.db = DatabaseManager()
+        self.settings = self.db.get_all_settings()
         self.player = AudioPlayer(self)
         self.trash = TrashService()
+
+        # Apply startup volume
+        init_vol = int(self.settings.get('volume', 80))
+        self.player.set_volume(init_vol)
+
+        # Auto-skip timer for preview duration
+        self.auto_skip_timer = QTimer(self)
+        self.auto_skip_timer.setSingleShot(True)
+        self.auto_skip_timer.timeout.connect(self.on_auto_skip_trigger)
 
         # State & Caching
         self.playlist = []
         self.current_index = -1
-        self.preview_mode = "Start of song"  # "Start of song", "Random point", "Middle + 30s"
+        self.preview_mode = self.settings.get('preview_mode', "Start of song (0:00)")
         self.metadata_cache = {}  # filepath -> meta
-        self.audio_cache = {}     # filepath -> io.BytesIO
         self.executor = ThreadPoolExecutor(max_workers=2)
 
         self.init_ui()
@@ -107,6 +117,7 @@ class MainWindow(QMainWindow):
         top_bar_layout = QHBoxLayout(top_bar)
 
         self.select_folder_btn = QPushButton("📁 Scan Folders")
+        self.settings_btn = QPushButton("⚙️ Settings")
         self.filter_combo = QComboBox()
         self.filter_combo.addItems([
             "All Songs",
@@ -123,14 +134,19 @@ class MainWindow(QMainWindow):
         self.preview_combo = QComboBox()
         self.preview_combo.addItems([
             "Start of song (0:00)",
+            "Custom Offset (sec)",
             "Middle + 30s",
             "Random point"
         ])
+        mode_val = self.settings.get('preview_mode', "Start of song (0:00)")
+        if mode_val in [self.preview_combo.itemText(i) for i in range(self.preview_combo.count())]:
+            self.preview_combo.setCurrentText(mode_val)
 
         self.progress_counter_label = QLabel("0 / 0")
         self.progress_counter_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #00adb5;")
 
         top_bar_layout.addWidget(self.select_folder_btn)
+        top_bar_layout.addWidget(self.settings_btn)
         top_bar_layout.addWidget(QLabel("Filter:"))
         top_bar_layout.addWidget(self.filter_combo)
         top_bar_layout.addWidget(QLabel("Smart Preview:"))
@@ -306,6 +322,7 @@ class MainWindow(QMainWindow):
 
     def connect_signals(self):
         self.select_folder_btn.clicked.connect(self.on_select_folder)
+        self.settings_btn.clicked.connect(self.open_settings_dialog)
         self.filter_combo.currentIndexChanged.connect(self.apply_filter)
         self.preview_combo.currentIndexChanged.connect(self.on_preview_mode_changed)
 
@@ -429,14 +446,46 @@ class MainWindow(QMainWindow):
 
         self.update_counter()
 
+    def open_settings_dialog(self):
+        dlg = SettingsDialog(self.settings, self)
+        dlg.settings_saved.connect(self.on_settings_saved)
+        dlg.exec()
+
+    def on_settings_saved(self, new_settings):
+        self.settings = new_settings
+        for k, v in new_settings.items():
+            self.db.set_setting(k, v)
+
+        # Apply settings live
+        vol = int(self.settings.get('volume', 80))
+        self.player.set_volume(vol)
+
+        mode_val = self.settings.get('preview_mode', 'Start of song (0:00)')
+        self.preview_mode = mode_val
+        if mode_val in [self.preview_combo.itemText(i) for i in range(self.preview_combo.count())]:
+            self.preview_combo.setCurrentText(mode_val)
+
+        # Re-trigger auto-skip timer if active
+        if str(self.settings.get('auto_skip_enabled', 'False')).lower() == 'true' and self.player.is_playing_state:
+            sec = int(self.settings.get('auto_skip_sec', 15))
+            self.auto_skip_timer.start(sec * 1000)
+        else:
+            self.auto_skip_timer.stop()
+
+    def on_auto_skip_trigger(self):
+        if self.player.is_playing_state:
+            self.next_song()
+
     def on_preview_mode_changed(self, index):
         self.preview_mode = self.preview_combo.currentText()
+        self.settings['preview_mode'] = self.preview_mode
+        self.db.set_setting('preview_mode', self.preview_mode)
 
     def preload_upcoming_songs(self, current_idx):
         if not self.playlist:
             return
 
-        target_indices = [current_idx + 1, current_idx + 2, current_idx + 3, current_idx + 4, current_idx - 1]
+        target_indices = [current_idx + i for i in range(1, 5)] + [current_idx - 1]
         valid_filepaths = []
 
         for idx in target_indices:
@@ -456,27 +505,13 @@ class MainWindow(QMainWindow):
                     except Exception:
                         pass
 
-                if path not in self.audio_cache:
-                    try:
-                        with open(path, 'rb') as f:
-                            data = f.read()
-                        self.audio_cache[path] = io.BytesIO(data)
-                    except Exception:
-                        pass
-
-            if len(self.audio_cache) > 6:
-                curr_path = self.playlist[current_idx]['filepath'] if 0 <= current_idx < len(self.playlist) else ''
-                keep = set(paths + [curr_path])
-                keys_to_remove = [k for k in self.audio_cache if k not in keep]
-                for k in keys_to_remove[:len(self.audio_cache) - 5]:
-                    self.audio_cache.pop(k, None)
-
         self.executor.submit(_worker, valid_filepaths)
 
     def load_song_at_index(self, index):
         if not self.playlist or index < 0 or index >= len(self.playlist):
             return
 
+        self.auto_skip_timer.stop()
         song = self.playlist[index]
         filepath = song['filepath']
 
@@ -522,17 +557,21 @@ class MainWindow(QMainWindow):
         # Smart Preview calculation
         start_pos = song.get('last_position', 0.0)
         if start_pos == 0.0:
-            if "Middle + 30s" in self.preview_mode and duration > 60:
+            if "Custom Offset" in self.preview_mode:
+                start_pos = float(self.settings.get('custom_start_sec', 0.0))
+            elif "Middle + 30s" in self.preview_mode and duration > 60:
                 start_pos = (duration / 2.0)
             elif "Random point" in self.preview_mode and duration > 30:
                 start_pos = random.uniform(5.0, max(5.0, duration - 15.0))
 
-        # Retrieve in-memory RAM buffer if pre-loaded
-        cached_buffer = self.audio_cache.get(filepath)
-
-        loaded = self.player.load_song(filepath, start_position=start_pos, file_buffer=cached_buffer)
+        loaded = self.player.load_song(filepath, start_position=start_pos)
+        
         if loaded:
             self.player.play()
+            # Check auto skip timer
+            if str(self.settings.get('auto_skip_enabled', 'False')).lower() == 'true':
+                sec = int(self.settings.get('auto_skip_sec', 15))
+                self.auto_skip_timer.start(sec * 1000)
         else:
             self.title_label.setText(f"⚠️ Audio Load Failed: {song.get('title') or os.path.basename(filepath)}")
 
@@ -540,10 +579,11 @@ class MainWindow(QMainWindow):
         self.waveform.set_position(start_pos)
         self.update_counter()
 
-        # Background pre-load next 4 songs into RAM cache
+        # Background pre-load upcoming songs into RAM cache
         self.preload_upcoming_songs(index)
 
     def clear_song_display(self):
+        self.auto_skip_timer.stop()
         self.player.stop()
         self.title_label.setText("Song: No songs available under current filter")
         self.artist_label.setText("Artist: -")
@@ -576,16 +616,25 @@ class MainWindow(QMainWindow):
             # Stop audio player playback so Windows releases file lock handle
             self.player.stop()
 
-            # Send to Recycle Bin & update DB
-            success, msg = self.trash.send_to_recycle_bin(filepath)
-            if not success:
-                print(f"Warning: {msg}")
+            del_mode = self.settings.get('delete_mode', 'recycle_bin')
+            if del_mode == 'permanent':
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                except Exception as e:
+                    print(f"Error permanently deleting file: {e}")
+            else:
+                # Send to Recycle Bin
+                success, msg = self.trash.send_to_recycle_bin(filepath)
+                if not success:
+                    print(f"Warning: {msg}")
 
             self.db.update_song_status(filepath, 'deleted')
 
             self.refresh_stats()
             self.refresh_history()
-            self.next_song()
+            if str(self.settings.get('auto_advance', 'True')).lower() == 'true':
+                self.next_song()
 
     def action_skip(self):
         if self.current_index >= 0 and self.current_index < len(self.playlist):
