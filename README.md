@@ -14,11 +14,11 @@ MusicCleaner is a high-speed desktop audio curation app designed to clean up lar
 
 - ⚡ **Lightning-Fast Playback**: Zero-delay song switching with background RAM pre-buffering.
 - ⌨️ **Keyboard-Driven Workflow**: Single keypress to Keep, Delete, Skip, Seek, or Undo.
-- 🎯 **Smart Preview Modes**: Jump straight to the action with 3 preview options (*Start of song*, *Middle + 30s*, or *Random point*).
+- 🎯 **Smart Preview Modes**: Jump straight to the action with 5 preview options (*Loudest Peak (Chorus)*, *Start of song*, *Custom Offset*, *Middle + 30s*, or *Random point*).
 - 🌊 **Interactive Waveform**: Visual audio timeline with click, drag, and mouse-wheel seeking.
 - 🗑️ **Safe Recycle Bin Deletion**: Deletes files safely to your OS Recycle Bin so nothing is lost permanently.
 - 🔍 **Smart Filters & Duplicate Detection**: Quickly filter by *Unreviewed Only*, *Duplicates Only*, *320 kbps Only*, *Unknown Artist*, or *Longer than 7 min*.
-- 📜 **Decision History & Undo**: Track your recent decisions with instant 1-click Undo (`Ctrl+Z`).
+- 📋 **Action History & Restore**: Live sidebar tracking recent decisions with single-click per-item **Restore** and instant **Undo** (`Ctrl+Z`).
 - 💾 **Auto-Save Progress**: Automatically saves your curation state so you can close and resume anytime.
 
 ---

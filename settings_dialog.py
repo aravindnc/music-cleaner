@@ -126,15 +126,15 @@ class SettingsDialog(QDialog):
         vol_layout.addWidget(self.vol_spin)
         audio_form.addRow("Startup Volume:", vol_layout)
 
-        # Default Song Start Time mode
         self.preview_mode_combo = QComboBox()
         self.preview_mode_combo.addItems([
+            "Loudest Peak (Chorus)",
             "Start of song (0:00)",
             "Custom Offset (sec)",
             "Middle + 30s",
             "Random point"
         ])
-        mode_val = self.settings.get('preview_mode', 'Start of song (0:00)')
+        mode_val = self.settings.get('preview_mode', 'Loudest Peak (Chorus)')
         if mode_val in [self.preview_mode_combo.itemText(i) for i in range(self.preview_mode_combo.count())]:
             self.preview_mode_combo.setCurrentText(mode_val)
 

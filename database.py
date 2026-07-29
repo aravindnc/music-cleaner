@@ -1,12 +1,27 @@
 import sqlite3
 import os
 import time
+import configparser
 
 class DatabaseManager:
     """SQLite Database manager for tracking song review status, positions, and history."""
     
-    def __init__(self, db_path="song.db"):
+    DEFAULT_SETTINGS = {
+        'volume': '80',
+        'preview_mode': 'Loudest Peak (Chorus)',
+        'custom_start_sec': '0.0',
+        'auto_skip_enabled': 'False',
+        'auto_skip_sec': '15',
+        'delete_mode': 'recycle_bin',
+    }
+
+    def __init__(self, db_path="song.db", ini_path=None):
         self.db_path = db_path
+        if ini_path:
+            self.ini_path = ini_path
+        else:
+            base_dir = os.path.dirname(os.path.abspath(db_path)) if db_path else os.getcwd()
+            self.ini_path = os.path.join(base_dir, "settings.ini")
         self.init_db()
 
     def get_connection(self):
@@ -47,14 +62,6 @@ class DatabaseManager:
                     prev_status TEXT NOT NULL,
                     timestamp REAL NOT NULL,
                     FOREIGN KEY (song_id) REFERENCES songs (id) ON DELETE CASCADE
-                )
-            """)
-
-            # Settings table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT
                 )
             """)
 
@@ -183,6 +190,22 @@ class DatabaseManager:
             conn.commit()
             return entry_dict
 
+    def restore_history_entry(self, history_id):
+        """Revert a specific decision history entry back to its previous status."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM history WHERE id = ?", (history_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            entry_dict = dict(row)
+            cursor.execute("UPDATE songs SET status = ?, updated_at = ? WHERE id = ?", 
+                           (entry_dict['prev_status'], time.time(), entry_dict['song_id']))
+            cursor.execute("DELETE FROM history WHERE id = ?", (history_id,))
+            conn.commit()
+            return entry_dict
+
     def get_history(self, limit=50):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -216,37 +239,51 @@ class DatabaseManager:
                 'unreviewed': row['unreviewed'] or 0
             }
 
-    DEFAULT_SETTINGS = {
-        'volume': '80',
-        'preview_mode': 'Start of song (0:00)',
-        'custom_start_sec': '0.0',
-        'auto_skip_enabled': 'False',
-        'auto_skip_sec': '15',
-        'delete_mode': 'recycle_bin',
-    }
+    def _read_ini(self):
+        config = configparser.ConfigParser()
+        config.optionxform = str  # Preserve key case
+        if os.path.exists(self.ini_path):
+            config.read(self.ini_path, encoding='utf-8')
+        return config
+
+    def _write_ini(self, config):
+        with open(self.ini_path, 'w', encoding='utf-8') as f:
+            config.write(f)
 
     def set_setting(self, key, value):
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, str(value)))
-            conn.commit()
+        config = self._read_ini()
+        if 'Settings' not in config:
+            config['Settings'] = {}
+
+        val_str = str(value)
+        default_val = self.DEFAULT_SETTINGS.get(key)
+
+        # Save custom settings only (if value equals default, remove from INI)
+        if default_val is not None and val_str == str(default_val):
+            if key in config['Settings']:
+                del config['Settings'][key]
+        else:
+            config['Settings'][key] = val_str
+
+        # If Settings section is empty, clean it up or remove file if empty
+        if not config['Settings']:
+            config.remove_section('Settings')
+
+        self._write_ini(config)
 
     def get_setting(self, key, default=None):
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
-            row = cursor.fetchone()
-            if row:
-                return row['value']
-            return self.DEFAULT_SETTINGS.get(key, default)
+        config = self._read_ini()
+        if 'Settings' in config and key in config['Settings']:
+            return config['Settings'][key]
+        return self.DEFAULT_SETTINGS.get(key, default)
 
     def get_all_settings(self):
         """Retrieve all settings as a dict with default fallbacks."""
         settings = dict(self.DEFAULT_SETTINGS)
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM settings")
-            for row in cursor.fetchall():
-                settings[row['key']] = row['value']
+        config = self._read_ini()
+        if 'Settings' in config:
+            for key, val in config['Settings'].items():
+                settings[key] = val
         return settings
+
 

@@ -5,24 +5,25 @@ from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QColor
 
 class DecisionHistoryWidget(QWidget):
-    """Sidebar widget displaying decision history and enabling single-click undo."""
+    """Sidebar widget displaying decision history and enabling single-click undo/restore."""
 
     undo_requested = Signal()
+    restore_requested = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumWidth(260)
-        self.setMaximumWidth(320)
+        self.setMaximumWidth(360)
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
         # Header
         header_layout = QHBoxLayout()
-        title_label = QLabel("📋 Decision History")
+        title_label = QLabel("📋 Action History")
         title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #eeeeee;")
         
         self.undo_btn = QPushButton("↺ Undo")
@@ -35,6 +36,7 @@ class DecisionHistoryWidget(QWidget):
                 border-radius: 4px;
                 padding: 4px 8px;
                 font-weight: bold;
+                font-size: 11px;
             }
             QPushButton:hover {
                 background-color: #00adb5;
@@ -49,7 +51,7 @@ class DecisionHistoryWidget(QWidget):
         layout.addLayout(header_layout)
 
         # Subtitle
-        sub_label = QLabel("Last 50 decisions:")
+        sub_label = QLabel("Recent decisions (click restore to undo item):")
         sub_label.setStyleSheet("color: #aaaaaa; font-size: 11px;")
         layout.addWidget(sub_label)
 
@@ -57,20 +59,20 @@ class DecisionHistoryWidget(QWidget):
         self.history_list = QListWidget()
         self.history_list.setStyleSheet("""
             QListWidget {
-                background-color: #1e1e24;
-                border: 1px solid #333;
+                background-color: #1a1a1e;
+                border: 1px solid #2a2a30;
                 border-radius: 6px;
                 padding: 4px;
             }
             QListWidget::item {
-                background-color: #2b2b36;
+                background-color: #25252b;
                 border-radius: 4px;
                 margin-bottom: 4px;
-                padding: 6px;
+                padding: 4px;
                 color: #dddddd;
             }
             QListWidget::item:hover {
-                background-color: #393e46;
+                background-color: #2e2e36;
             }
         """)
         layout.addWidget(self.history_list)
@@ -97,13 +99,18 @@ class DecisionHistoryWidget(QWidget):
                 text_action = "SKIP"
 
             widget = QWidget()
-            w_layout = QVBoxLayout(widget)
-            w_layout.setContentsMargins(2, 2, 2, 2)
+            row_layout = QHBoxLayout(widget)
+            row_layout.setContentsMargins(4, 4, 4, 4)
+            row_layout.setSpacing(6)
+
+            text_container = QWidget()
+            w_layout = QVBoxLayout(text_container)
+            w_layout.setContentsMargins(0, 0, 0, 0)
             w_layout.setSpacing(2)
 
             top_line = QLabel(f"<span style='{badge_style} font-weight:bold;'>{icon} {text_action}</span> - {title}")
             top_line.setTextFormat(Qt.RichText)
-            top_line.setStyleSheet("font-size: 12px;")
+            top_line.setStyleSheet("font-size: 11px;")
             top_line.setWordWrap(True)
 
             sub_line = QLabel(artist)
@@ -112,7 +119,29 @@ class DecisionHistoryWidget(QWidget):
             w_layout.addWidget(top_line)
             w_layout.addWidget(sub_line)
 
+            restore_btn = QPushButton("↩ Restore")
+            restore_btn.setToolTip(f"Restore '{title}' to previous status ({item.get('prev_status', 'unreviewed')})")
+            restore_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2b2b36;
+                    color: #00adb5;
+                    border: 1px solid #00adb5;
+                    border-radius: 4px;
+                    padding: 3px 6px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #00adb5;
+                    color: #121214;
+                }
+            """)
+            restore_btn.clicked.connect(lambda checked=False, e=item: self.restore_requested.emit(e))
+
+            row_layout.addWidget(text_container, 1)
+            row_layout.addWidget(restore_btn, 0, Qt.AlignRight | Qt.AlignVCenter)
+
             list_item = QListWidgetItem(self.history_list)
-            list_item.setSizeHint(QSize(220, 48))
+            list_item.setSizeHint(QSize(220, 52))
             self.history_list.addItem(list_item)
             self.history_list.setItemWidget(list_item, widget)

@@ -30,6 +30,7 @@ class AudioPlayer(QObject):
     position_changed = Signal(float)  # current time in seconds
     duration_changed = Signal(float)  # total duration in seconds
     playback_ended = Signal()
+    playback_error = Signal(str)
     state_changed = Signal(bool)       # True if playing, False if paused
 
     def __init__(self, parent=None):
@@ -101,8 +102,8 @@ class AudioPlayer(QObject):
 
         if self.use_vlc:
             loaded_ok = False
-            
-            # Prioritize direct file loading when file exists on disk
+
+            # Prioritize direct file loading when file exists on disk (native C streaming, 0 GIL overhead, low RAM)
             if os.path.exists(filepath):
                 try:
                     norm_path = os.path.normpath(filepath)
@@ -185,6 +186,38 @@ class AudioPlayer(QObject):
                         break
                     except Exception as e:
                         time.sleep(0.05)
+
+            # Fallback to buffer loading if path load failed or virtual stream
+            if not loaded_ok and file_buffer is not None:
+                raw_data = None
+                if isinstance(file_buffer, bytes):
+                    raw_data = file_buffer
+                elif hasattr(file_buffer, 'getvalue'):
+                    raw_data = file_buffer.getvalue()
+                else:
+                    try:
+                        file_buffer.seek(0)
+                        raw_data = file_buffer.read()
+                    except Exception:
+                        pass
+
+                if raw_data:
+                    try:
+                        import io
+                        self._current_buffer = io.BytesIO(raw_data)
+                        ext_clean = os.path.splitext(filepath)[1].lower().lstrip('.')
+                        hints = [h for h in [ext_clean, 'mp3', 'wav', 'ogg'] if h]
+
+                        for hint in hints:
+                            try:
+                                self._current_buffer.seek(0)
+                                pygame.mixer.music.load(self._current_buffer, hint)
+                                loaded_ok = True
+                                break
+                            except Exception:
+                                continue
+                    except Exception as e:
+                        print(f"Pygame buffer load failed: {e}")
                 if not loaded_ok:
                     print(f"Pygame load error for path {filepath}")
 
@@ -236,7 +269,12 @@ class AudioPlayer(QObject):
         self._is_paused = False
 
         if self.use_vlc:
-            self.vlc_player.play()
+            res = self.vlc_player.play()
+            if res == -1:
+                self.is_playing_state = False
+                self.state_changed.emit(False)
+                self.playback_error.emit("VLC play failed")
+                return
             self.timer.start()
         elif self.use_pygame:
             try:
@@ -256,6 +294,7 @@ class AudioPlayer(QObject):
                 print(f"Pygame play error: {e}")
                 self.is_playing_state = False
                 self.state_changed.emit(False)
+                self.playback_error.emit(str(e))
                 return
 
         self.is_playing_state = True
@@ -360,7 +399,10 @@ class AudioPlayer(QObject):
         self.position_changed.emit(pos)
 
         state = self.vlc_player.get_state()
-        if state in (vlc.State.Ended, vlc.State.Error):
+        if state == vlc.State.Error:
+            self.stop()
+            self.playback_error.emit("VLC error state detected")
+        elif state == vlc.State.Ended:
             self.stop()
             self.playback_ended.emit()
 
