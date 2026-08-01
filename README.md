@@ -6,6 +6,10 @@
 
 > **Rapidly review, keep, or delete thousands of audio files with lightning-fast keyboard shortcuts.**
 
+<p align="center">
+  <img src="banner.jpg" alt="MusicCleaner Interface Banner" />
+</p>
+
 MusicCleaner is a high-speed desktop audio curation app designed to clean up large music collections (5,000 to 50,000+ tracks). Easily review 700–1,000 songs per hour without popups or mouse clicks.
 
 <p align="center">
